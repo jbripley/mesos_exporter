@@ -9,12 +9,26 @@ type Monitor struct {
 }
 
 type Statistics struct {
-	CpusUserTimeSecs   float64 `json:"cpus_user_time_secs"`
-	CpusSystemTimeSecs float64 `json:"cpus_system_time_secs"`
-	CpusLimit          float64 `json:"cpus_limit"`
-	MemRssBytes        int64   `json:"mem_rss_bytes"`
-	MemLimitBytes      int64   `json:"mem_limit_bytes"`
-	Timestamp          float64 `json:"timestamp"`
+	CpusLimit             float64 `json:"cpus_limit"`
+	CpusNrPeriods         int64   `json:"cpus_nr_periods"`
+	CpusNrThrottled       int64   `json:"cpus_nr_throttled"`
+	CpusSystemTimeSecs    float64 `json:"cpus_system_time_secs"`
+	CpusThrottledTimeSecs float64 `json:"cpus_throttled_time_secs"`
+	CpusUserTimeSecs      float64 `json:"cpus_user_time_secs"`
+	MemAnonBytes          int64   `json:"mem_anon_bytes"`
+	MemFileBytes          int64   `json:"mem_file_bytes"`
+	MemLimitBytes         int64   `json:"mem_limit_bytes"`
+	MemMappedBytes        int64   `json:"mem_mapped_bytes"`
+	MemRssBytes           int64   `json:"mem_rss_bytes"`
+	NetRxBytes            int64   `json:"net_rx_bytes"`
+	NetRxDropped          int64   `json:"net_rx_dropped"`
+	NetRxErrors           int64   `json:"net_rx_errors"`
+	NetRxPackets          int64   `json:"net_rx_packets"`
+	NetTxBytes            int64   `json:"net_tx_bytes"`
+	NetTxDropped          int64   `json:"net_tx_dropped"`
+	NetTxErrors           int64   `json:"net_tx_errors"`
+	NetTxPackets          int64   `json:"net_tx_packets"`
+	Timestamp             float64 `json:"timestamp"`
 }
 
 type Metrics struct {
