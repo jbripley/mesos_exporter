@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antonlindstrom/mesos_stats"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/log"
 )
@@ -153,7 +152,7 @@ func (e *exporter) fetch(urlChan <-chan string, metricsChan chan<- prometheus.Me
 		}
 		defer resp.Body.Close()
 
-		var stats []mesos_stats.Monitor
+		var stats []Monitor
 		if err = json.NewDecoder(resp.Body).Decode(&stats); err != nil {
 			log.Warn("failed to deserialize response: ", err)
 			e.errors.WithLabelValues(host).Inc()
