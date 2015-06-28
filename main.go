@@ -27,13 +27,59 @@ var (
 	metricsPath  = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
 )
 
+func newMetric(subsys string, labels []string, name string, descr string) *prometheus.Desc {
+	fqn := prometheus.BuildFQName(namespace, subsys, name)
+	return prometheus.NewDesc(fqn, descr, labels, nil)
+}
+
+func newSlaveMetric(name string, descr string) *prometheus.Desc {
+	return newMetric("slave", []string{"slave"}, name, descr)
+}
+
+func newSystemMetric(name string, descr string) *prometheus.Desc {
+	return newMetric("system", []string{"slave"}, name, descr)
+}
+
 func newTaskMetric(name string, descr string) *prometheus.Desc {
-	fqn := prometheus.BuildFQName(namespace, "task", name)
-	return prometheus.NewDesc(fqn, descr, taskVariableLabels, nil)
+	return newMetric("task", []string{"task", "slave", "framework_id"}, name, descr)
 }
 
 var (
-	taskVariableLabels = []string{"task", "slave", "framework_id"}
+	slaveCpusPercent              = newSlaveMetric("cpus_percent", "CPU used in percent.")
+	slaveCpusTotal                = newSlaveMetric("cpus_total", "Total CPU count.")
+	slaveCpusUsed                 = newSlaveMetric("cpus_used", "CPUs allocated to tasks.")
+	slaveDiskPercent              = newSlaveMetric("disk_percent", "Disk usage in percent.")
+	slaveDiskTotal                = newSlaveMetric("disk_total", "Disk available.")
+	slaveDiskUsed                 = newSlaveMetric("disk_used", "Disk used.")
+	slaveExecutorsRegistering     = newSlaveMetric("executors_registering", "Executors registering count.")
+	slaveExecutorsRunning         = newSlaveMetric("executors_running", "Executors running count.")
+	slaveExecutorsTerminated      = newSlaveMetric("executors_terminated", "Executors terminated count.")
+	slaveExecutorsTerminating     = newSlaveMetric("executors_terminating", "Executors terminating count.")
+	slaveFrameworksActive         = newSlaveMetric("frameworks_active", "Number of active frameworks.")
+	slaveInvalidFrameworkMessages = newSlaveMetric("invalid_framework_messages", "Invalid framework message count.")
+	slaveInvalidStatusUpdates     = newSlaveMetric("invalid_status_updates", "Invalid status update count.")
+	slaveMemPercent               = newSlaveMetric("mem_percent", "Memory usage in percent.")
+	slaveMemTotal                 = newSlaveMetric("mem_total", "Memory total available.")
+	slaveMemUsed                  = newSlaveMetric("mem_used", "Memory total used.")
+	slaveRecoveryErrors           = newSlaveMetric("recovery_errors", "Recovery error count.")
+	slaveRegistered               = newSlaveMetric("registered", "Register count.")
+	slaveTasksFailed              = newSlaveMetric("tasks_failed", "Number of tasks failed.")
+	slaveTasksFinished            = newSlaveMetric("tasks_finished", "Number of tasks finished.")
+	slaveTasksKilled              = newSlaveMetric("tasks_killed", "Number of tasks killed.")
+	slaveTasksLost                = newSlaveMetric("tasks_lost", "Number of tasks lost.")
+	slaveTasksRunning             = newSlaveMetric("tasks_running", "Number of tasks running.")
+	slaveTasksStaging             = newSlaveMetric("tasks_staging", "Number of tasks staging.")
+	slaveTasksStarting            = newSlaveMetric("tasks_starting", "Number of tasks starting.")
+	slaveUptimeSecs               = newSlaveMetric("uptime_secs", "Slave uptime in seconds.")
+	slaveValidFrameworkMessages   = newSlaveMetric("valid_framework_messages", "Valid framework message count.")
+	slaveValidStatusUpdates       = newSlaveMetric("valid_status_updates", "Valid status updates count.")
+
+	sysCpusTotal     = newSystemMetric("cpus_total", "Total CPU count.")
+	sysLoad15min     = newSystemMetric("load_15min", "System load 15 minute.")
+	sysLoad1min      = newSystemMetric("load_1min", "System load 1 minute.")
+	sysLoad5min      = newSystemMetric("load_5min", "System load 5 minute.")
+	sysMemFreeBytes  = newSystemMetric("mem_free_bytes", "Total memory free in bytes.")
+	sysMemTotalBytes = newSystemMetric("mem_total_bytes", "Total memory used in bytes.")
 
 	taskCpuLimitDesc       = newTaskMetric("cpus_limit", "Fractional CPU limit")
 	taskCpuNrPeriodsDesc   = newTaskMetric("cpus_nr_periods", "Cumulative CPU periods.")
@@ -169,26 +215,86 @@ func (e *exporter) fetch(urlChan <-chan string, metricsChan chan<- prometheus.Me
 
 		for _, mon := range stats {
 			stats := mon.Statistics
-			report(&mon, taskCpuLimitDesc, float64(stats.CpusLimit))
-			report(&mon, taskCpuNrPeriodsDesc, float64(stats.CpusNrPeriods))
-			report(&mon, taskCpuNrThrottledDesc, float64(stats.CpusNrThrottled))
-			report(&mon, taskCpuSysDesc, float64(stats.CpusSystemTimeSecs))
-			report(&mon, taskCpuThrottledDesc, float64(stats.CpusThrottledTimeSecs))
-			report(&mon, taskCpuUsrDesc, float64(stats.CpusUserTimeSecs))
-			report(&mon, taskMemAnonDesc, float64(stats.MemAnonBytes))
-			report(&mon, taskMemFileDesc, float64(stats.MemFileBytes))
-			report(&mon, taskMemLimitDesc, float64(stats.MemLimitBytes))
-			report(&mon, taskMemMappedDesc, float64(stats.MemMappedBytes))
-			report(&mon, taskMemRssDesc, float64(stats.MemRssBytes))
-			report(&mon, taskNetRxBytes, float64(stats.NetRxBytes))
-			report(&mon, taskNetRxDropped, float64(stats.NetRxDropped))
-			report(&mon, taskNetRxErrors, float64(stats.NetRxErrors))
-			report(&mon, taskNetRxPackets, float64(stats.NetRxPackets))
-			report(&mon, taskNetTxBytes, float64(stats.NetTxBytes))
-			report(&mon, taskNetTxDropped, float64(stats.NetTxDropped))
-			report(&mon, taskNetTxErrors, float64(stats.NetTxErrors))
-			report(&mon, taskNetTxPackets, float64(stats.NetTxPackets))
+			report(&mon, taskCpuLimitDesc, stats.CpusLimit)
+			report(&mon, taskCpuNrPeriodsDesc, stats.CpusNrPeriods)
+			report(&mon, taskCpuNrThrottledDesc, stats.CpusNrThrottled)
+			report(&mon, taskCpuSysDesc, stats.CpusSystemTimeSecs)
+			report(&mon, taskCpuThrottledDesc, stats.CpusThrottledTimeSecs)
+			report(&mon, taskCpuUsrDesc, stats.CpusUserTimeSecs)
+			report(&mon, taskMemAnonDesc, stats.MemAnonBytes)
+			report(&mon, taskMemFileDesc, stats.MemFileBytes)
+			report(&mon, taskMemLimitDesc, stats.MemLimitBytes)
+			report(&mon, taskMemMappedDesc, stats.MemMappedBytes)
+			report(&mon, taskMemRssDesc, stats.MemRssBytes)
+			report(&mon, taskNetRxBytes, stats.NetRxBytes)
+			report(&mon, taskNetRxDropped, stats.NetRxDropped)
+			report(&mon, taskNetRxErrors, stats.NetRxErrors)
+			report(&mon, taskNetRxPackets, stats.NetRxPackets)
+			report(&mon, taskNetTxBytes, stats.NetTxBytes)
+			report(&mon, taskNetTxDropped, stats.NetTxDropped)
+			report(&mon, taskNetTxErrors, stats.NetTxErrors)
+			report(&mon, taskNetTxPackets, stats.NetTxPackets)
 		}
+
+		metricsURL := fmt.Sprintf("%s/metrics/snapshot", u)
+		resp2, err := httpClient.Get(metricsURL)
+		if err != nil {
+			log.Warn(err)
+			e.errors.WithLabelValues(host).Inc()
+			continue
+		}
+		defer resp2.Body.Close()
+
+		var metrics SlaveMetrics
+		if err = json.NewDecoder(resp2.Body).Decode(&metrics); err != nil {
+			log.Warn("failed to deserialize response: ", err)
+			e.errors.WithLabelValues(host).Inc()
+			continue
+		}
+
+		reportMetric := func(desc *prometheus.Desc, value float64) {
+			metricsChan <- prometheus.MustNewConstMetric(
+				desc,
+				prometheus.GaugeValue,
+				value,
+				host,
+			)
+		}
+
+		reportMetric(slaveCpusPercent, metrics.SlaveCpusPercent)
+		reportMetric(slaveCpusTotal, metrics.SlaveCpusTotal)
+		reportMetric(slaveCpusUsed, metrics.SlaveCpusUsed)
+		reportMetric(slaveDiskPercent, metrics.SlaveDiskPercent)
+		reportMetric(slaveDiskTotal, metrics.SlaveDiskTotal)
+		reportMetric(slaveDiskUsed, metrics.SlaveDiskUsed)
+		reportMetric(slaveExecutorsRegistering, metrics.SlaveExecutorsRegistering)
+		reportMetric(slaveExecutorsRunning, metrics.SlaveExecutorsRunning)
+		reportMetric(slaveExecutorsTerminated, metrics.SlaveExecutorsTerminated)
+		reportMetric(slaveExecutorsTerminating, metrics.SlaveExecutorsTerminating)
+		reportMetric(slaveFrameworksActive, metrics.SlaveFrameworksActive)
+		reportMetric(slaveInvalidFrameworkMessages, metrics.SlaveInvalidFrameworkMessages)
+		reportMetric(slaveInvalidStatusUpdates, metrics.SlaveInvalidStatusUpdates)
+		reportMetric(slaveMemPercent, metrics.SlaveMemPercent)
+		reportMetric(slaveMemTotal, metrics.SlaveMemTotal)
+		reportMetric(slaveMemUsed, metrics.SlaveMemUsed)
+		reportMetric(slaveRecoveryErrors, metrics.SlaveRecoveryErrors)
+		reportMetric(slaveRegistered, metrics.SlaveRegistered)
+		reportMetric(slaveTasksFailed, metrics.SlaveTasksFailed)
+		reportMetric(slaveTasksFinished, metrics.SlaveTasksFinished)
+		reportMetric(slaveTasksKilled, metrics.SlaveTasksKilled)
+		reportMetric(slaveTasksLost, metrics.SlaveTasksLost)
+		reportMetric(slaveTasksRunning, metrics.SlaveTasksRunning)
+		reportMetric(slaveTasksStaging, metrics.SlaveTasksStaging)
+		reportMetric(slaveTasksStarting, metrics.SlaveTasksStarting)
+		reportMetric(slaveUptimeSecs, metrics.SlaveUptimeSecs)
+		reportMetric(slaveValidFrameworkMessages, metrics.SlaveValidFrameworkMessages)
+		reportMetric(slaveValidStatusUpdates, metrics.SlaveValidStatusUpdates)
+		reportMetric(sysCpusTotal, metrics.SystemCpusTotal)
+		reportMetric(sysLoad15min, metrics.SystemLoad15min)
+		reportMetric(sysLoad1min, metrics.SystemLoad1min)
+		reportMetric(sysLoad5min, metrics.SystemLoad5min)
+		reportMetric(sysMemFreeBytes, metrics.SystemMemFreeBytes)
+		reportMetric(sysMemTotalBytes, metrics.SystemMemTotalBytes)
 	}
 }
 
