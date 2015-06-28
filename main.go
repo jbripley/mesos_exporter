@@ -27,34 +27,33 @@ var (
 	metricsPath  = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
 )
 
+func newTaskMetric(name string, descr string) *prometheus.Desc {
+	fqn := prometheus.BuildFQName(namespace, "task", name)
+	return prometheus.NewDesc(fqn, descr, taskVariableLabels, nil)
+}
+
 var (
 	taskVariableLabels = []string{"task", "slave", "framework_id"}
 
-	taskCpuLimitDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "task", "cpus_limit"),
-		"Fractional CPU limit.",
-		taskVariableLabels, nil,
-	)
-	taskCpuSysDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "task", "cpus_system_time_secs"),
-		"Cumulative system CPU time in seconds.",
-		taskVariableLabels, nil,
-	)
-	taskCpuUsrDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "task", "cpu_user_time_secs"),
-		"Cumulative user CPU time in seconds.",
-		taskVariableLabels, nil,
-	)
-	taskMemLimitDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "task", "memory_limit_bytes"),
-		"Task memory limit in bytes.",
-		taskVariableLabels, nil,
-	)
-	taskMemRssDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "task", "memory_rss_bytes"),
-		"Task memory RSS usage in bytes.",
-		taskVariableLabels, nil,
-	)
+	taskCpuLimitDesc       = newTaskMetric("cpus_limit", "Fractional CPU limit")
+	taskCpuNrPeriodsDesc   = newTaskMetric("cpus_nr_periods", "Cumulative CPU periods.")
+	taskCpuNrThrottledDesc = newTaskMetric("cpus_nr_throttled", "Cumulative throttled CPU periods.")
+	taskCpuSysDesc         = newTaskMetric("cpus_system_time_secs", "Cumulative system CPU time in seconds.")
+	taskCpuThrottledDesc   = newTaskMetric("cpus_throttled_time_secs", "Cumulative throttled CPU time in seconds.")
+	taskCpuUsrDesc         = newTaskMetric("cpu_user_time_secs", "Cumulative user CPU time in seconds.")
+	taskMemAnonDesc        = newTaskMetric("memory_anon_bytes", "Task memory anonymous usage in bytes.")
+	taskMemFileDesc        = newTaskMetric("memory_file_bytes", "Task memory file usage in bytes.")
+	taskMemMappedDesc      = newTaskMetric("memory_mapped_bytes", "Task memory mapped usage in bytes.")
+	taskMemLimitDesc       = newTaskMetric("memory_limit_bytes", "Task memory limit in bytes.")
+	taskMemRssDesc         = newTaskMetric("memory_rss_bytes", "Task memory RSS usage in bytes.")
+	taskNetRxBytes         = newTaskMetric("net_rx_bytes", "Network received bytes.")
+	taskNetRxDropped       = newTaskMetric("net_rx_dropped", "Network received packets dropped.")
+	taskNetRxErrors        = newTaskMetric("net_rx_errors", "Network received packet errors.")
+	taskNetRxPackets       = newTaskMetric("net_rx_packets", "Network received packets.")
+	taskNetTxBytes         = newTaskMetric("net_tx_bytes", "Network sent bytes.")
+	taskNetTxDropped       = newTaskMetric("net_tx_dropped", "Network sent packets dropped.")
+	taskNetTxErrors        = newTaskMetric("net_tx_errors", "Network sent packets ererors.")
+	taskNetTxPackets       = newTaskMetric("net_tx_packets", "Network sent packets.")
 )
 
 var httpClient = http.Client{
@@ -159,37 +158,36 @@ func (e *exporter) fetch(urlChan <-chan string, metricsChan chan<- prometheus.Me
 			continue
 		}
 
-		for _, stat := range stats {
+		report := func(mon *Monitor, desc *prometheus.Desc, value float64) {
 			metricsChan <- prometheus.MustNewConstMetric(
-				taskCpuLimitDesc,
+				desc,
 				prometheus.GaugeValue,
-				float64(stat.Statistics.CpusLimit),
-				stat.Source, host, stat.FrameworkId,
+				value,
+				mon.Source, host, mon.FrameworkId,
 			)
-			metricsChan <- prometheus.MustNewConstMetric(
-				taskCpuSysDesc,
-				prometheus.CounterValue,
-				float64(stat.Statistics.CpusSystemTimeSecs),
-				stat.Source, host, stat.FrameworkId,
-			)
-			metricsChan <- prometheus.MustNewConstMetric(
-				taskCpuUsrDesc,
-				prometheus.CounterValue,
-				float64(stat.Statistics.CpusUserTimeSecs),
-				stat.Source, host, stat.FrameworkId,
-			)
-			metricsChan <- prometheus.MustNewConstMetric(
-				taskMemLimitDesc,
-				prometheus.GaugeValue,
-				float64(stat.Statistics.MemLimitBytes),
-				stat.Source, host, stat.FrameworkId,
-			)
-			metricsChan <- prometheus.MustNewConstMetric(
-				taskMemRssDesc,
-				prometheus.GaugeValue,
-				float64(stat.Statistics.MemRssBytes),
-				stat.Source, host, stat.FrameworkId,
-			)
+		}
+
+		for _, mon := range stats {
+			stats := mon.Statistics
+			report(&mon, taskCpuLimitDesc, float64(stats.CpusLimit))
+			report(&mon, taskCpuNrPeriodsDesc, float64(stats.CpusNrPeriods))
+			report(&mon, taskCpuNrThrottledDesc, float64(stats.CpusNrThrottled))
+			report(&mon, taskCpuSysDesc, float64(stats.CpusSystemTimeSecs))
+			report(&mon, taskCpuThrottledDesc, float64(stats.CpusThrottledTimeSecs))
+			report(&mon, taskCpuUsrDesc, float64(stats.CpusUserTimeSecs))
+			report(&mon, taskMemAnonDesc, float64(stats.MemAnonBytes))
+			report(&mon, taskMemFileDesc, float64(stats.MemFileBytes))
+			report(&mon, taskMemLimitDesc, float64(stats.MemLimitBytes))
+			report(&mon, taskMemMappedDesc, float64(stats.MemMappedBytes))
+			report(&mon, taskMemRssDesc, float64(stats.MemRssBytes))
+			report(&mon, taskNetRxBytes, float64(stats.NetRxBytes))
+			report(&mon, taskNetRxDropped, float64(stats.NetRxDropped))
+			report(&mon, taskNetRxErrors, float64(stats.NetRxErrors))
+			report(&mon, taskNetRxPackets, float64(stats.NetRxPackets))
+			report(&mon, taskNetTxBytes, float64(stats.NetTxBytes))
+			report(&mon, taskNetTxDropped, float64(stats.NetTxDropped))
+			report(&mon, taskNetTxErrors, float64(stats.NetTxErrors))
+			report(&mon, taskNetTxPackets, float64(stats.NetTxPackets))
 		}
 	}
 }
