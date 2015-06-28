@@ -172,6 +172,120 @@ func (e *exporter) Collect(ch chan<- prometheus.Metric) {
 	e.errors.MetricVec.Collect(ch)
 }
 
+func (e *exporter) fetchTaskMetrics(host string, port string, metricsChan chan<- prometheus.Metric, wg *sync.WaitGroup) {
+	defer wg.Done()
+	url := fmt.Sprintf("http://%s:%s/monitor/statistics.json", host, port)
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		log.Warn(err)
+		e.errors.WithLabelValues(host).Inc()
+		return
+	}
+	defer resp.Body.Close()
+
+	var stats []Monitor
+	if err = json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		log.Warn("failed to deserialize response: ", err)
+		e.errors.WithLabelValues(host).Inc()
+		return
+	}
+
+	report := func(mon *Monitor, desc *prometheus.Desc, value float64) {
+		metricsChan <- prometheus.MustNewConstMetric(desc,
+			prometheus.GaugeValue,
+			value,
+			mon.Source, host, mon.FrameworkId,
+		)
+	}
+
+	for _, mon := range stats {
+		stats := mon.Statistics
+		report(&mon, taskCpuLimitDesc, stats.CpusLimit)
+		report(&mon, taskCpuNrPeriodsDesc, stats.CpusNrPeriods)
+		report(&mon, taskCpuNrThrottledDesc, stats.CpusNrThrottled)
+		report(&mon, taskCpuSysDesc, stats.CpusSystemTimeSecs)
+		report(&mon, taskCpuThrottledDesc, stats.CpusThrottledTimeSecs)
+		report(&mon, taskCpuUsrDesc, stats.CpusUserTimeSecs)
+		report(&mon, taskMemAnonDesc, stats.MemAnonBytes)
+		report(&mon, taskMemFileDesc, stats.MemFileBytes)
+		report(&mon, taskMemLimitDesc, stats.MemLimitBytes)
+		report(&mon, taskMemMappedDesc, stats.MemMappedBytes)
+		report(&mon, taskMemRssDesc, stats.MemRssBytes)
+		report(&mon, taskNetRxBytes, stats.NetRxBytes)
+		report(&mon, taskNetRxDropped, stats.NetRxDropped)
+		report(&mon, taskNetRxErrors, stats.NetRxErrors)
+		report(&mon, taskNetRxPackets, stats.NetRxPackets)
+		report(&mon, taskNetTxBytes, stats.NetTxBytes)
+		report(&mon, taskNetTxDropped, stats.NetTxDropped)
+		report(&mon, taskNetTxErrors, stats.NetTxErrors)
+		report(&mon, taskNetTxPackets, stats.NetTxPackets)
+	}
+}
+
+func (e *exporter) fetchSlaveMetrics(host string, port string, metricsChan chan<- prometheus.Metric, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	url := fmt.Sprintf("http://%s:%s/metrics/snapshot", host, port)
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		log.Warn(err)
+		e.errors.WithLabelValues(host).Inc()
+		return
+	}
+	defer resp.Body.Close()
+
+	var metrics SlaveMetrics
+	if err = json.NewDecoder(resp.Body).Decode(&metrics); err != nil {
+		log.Warn("failed to deserialize response: ", err)
+		e.errors.WithLabelValues(host).Inc()
+		return
+	}
+
+	report := func(desc *prometheus.Desc, value float64) {
+		metricsChan <- prometheus.MustNewConstMetric(
+			desc,
+			prometheus.GaugeValue,
+			value,
+			host,
+		)
+	}
+
+	report(slaveCpusPercent, metrics.SlaveCpusPercent)
+	report(slaveCpusTotal, metrics.SlaveCpusTotal)
+	report(slaveCpusUsed, metrics.SlaveCpusUsed)
+	report(slaveDiskPercent, metrics.SlaveDiskPercent)
+	report(slaveDiskTotal, metrics.SlaveDiskTotal)
+	report(slaveDiskUsed, metrics.SlaveDiskUsed)
+	report(slaveExecutorsRegistering, metrics.SlaveExecutorsRegistering)
+	report(slaveExecutorsRunning, metrics.SlaveExecutorsRunning)
+	report(slaveExecutorsTerminated, metrics.SlaveExecutorsTerminated)
+	report(slaveExecutorsTerminating, metrics.SlaveExecutorsTerminating)
+	report(slaveFrameworksActive, metrics.SlaveFrameworksActive)
+	report(slaveInvalidFrameworkMessages, metrics.SlaveInvalidFrameworkMessages)
+	report(slaveInvalidStatusUpdates, metrics.SlaveInvalidStatusUpdates)
+	report(slaveMemPercent, metrics.SlaveMemPercent)
+	report(slaveMemTotal, metrics.SlaveMemTotal)
+	report(slaveMemUsed, metrics.SlaveMemUsed)
+	report(slaveRecoveryErrors, metrics.SlaveRecoveryErrors)
+	report(slaveRegistered, metrics.SlaveRegistered)
+	report(slaveTasksFailed, metrics.SlaveTasksFailed)
+	report(slaveTasksFinished, metrics.SlaveTasksFinished)
+	report(slaveTasksKilled, metrics.SlaveTasksKilled)
+	report(slaveTasksLost, metrics.SlaveTasksLost)
+	report(slaveTasksRunning, metrics.SlaveTasksRunning)
+	report(slaveTasksStaging, metrics.SlaveTasksStaging)
+	report(slaveTasksStarting, metrics.SlaveTasksStarting)
+	report(slaveUptimeSecs, metrics.SlaveUptimeSecs)
+	report(slaveValidFrameworkMessages, metrics.SlaveValidFrameworkMessages)
+	report(slaveValidStatusUpdates, metrics.SlaveValidStatusUpdates)
+	report(sysCpusTotal, metrics.SystemCpusTotal)
+	report(sysLoad15min, metrics.SystemLoad15min)
+	report(sysLoad1min, metrics.SystemLoad1min)
+	report(sysLoad5min, metrics.SystemLoad5min)
+	report(sysMemFreeBytes, metrics.SystemMemFreeBytes)
+	report(sysMemTotalBytes, metrics.SystemMemTotalBytes)
+}
+
 func (e *exporter) fetch(urlChan <-chan string, metricsChan chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -182,119 +296,15 @@ func (e *exporter) fetch(urlChan <-chan string, metricsChan chan<- prometheus.Me
 			continue
 		}
 
-		host, _, err := net.SplitHostPort(u.Host)
+		host, port, err := net.SplitHostPort(u.Host)
 		if err != nil {
 			log.Warn("could not parse network address: ", err)
 			continue
 		}
 
-		monitorURL := fmt.Sprintf("%s/monitor/statistics.json", u)
-		resp, err := httpClient.Get(monitorURL)
-		if err != nil {
-			log.Warn(err)
-			e.errors.WithLabelValues(host).Inc()
-			continue
-		}
-		defer resp.Body.Close()
-
-		var stats []Monitor
-		if err = json.NewDecoder(resp.Body).Decode(&stats); err != nil {
-			log.Warn("failed to deserialize response: ", err)
-			e.errors.WithLabelValues(host).Inc()
-			continue
-		}
-
-		report := func(mon *Monitor, desc *prometheus.Desc, value float64) {
-			metricsChan <- prometheus.MustNewConstMetric(
-				desc,
-				prometheus.GaugeValue,
-				value,
-				mon.Source, host, mon.FrameworkId,
-			)
-		}
-
-		for _, mon := range stats {
-			stats := mon.Statistics
-			report(&mon, taskCpuLimitDesc, stats.CpusLimit)
-			report(&mon, taskCpuNrPeriodsDesc, stats.CpusNrPeriods)
-			report(&mon, taskCpuNrThrottledDesc, stats.CpusNrThrottled)
-			report(&mon, taskCpuSysDesc, stats.CpusSystemTimeSecs)
-			report(&mon, taskCpuThrottledDesc, stats.CpusThrottledTimeSecs)
-			report(&mon, taskCpuUsrDesc, stats.CpusUserTimeSecs)
-			report(&mon, taskMemAnonDesc, stats.MemAnonBytes)
-			report(&mon, taskMemFileDesc, stats.MemFileBytes)
-			report(&mon, taskMemLimitDesc, stats.MemLimitBytes)
-			report(&mon, taskMemMappedDesc, stats.MemMappedBytes)
-			report(&mon, taskMemRssDesc, stats.MemRssBytes)
-			report(&mon, taskNetRxBytes, stats.NetRxBytes)
-			report(&mon, taskNetRxDropped, stats.NetRxDropped)
-			report(&mon, taskNetRxErrors, stats.NetRxErrors)
-			report(&mon, taskNetRxPackets, stats.NetRxPackets)
-			report(&mon, taskNetTxBytes, stats.NetTxBytes)
-			report(&mon, taskNetTxDropped, stats.NetTxDropped)
-			report(&mon, taskNetTxErrors, stats.NetTxErrors)
-			report(&mon, taskNetTxPackets, stats.NetTxPackets)
-		}
-
-		metricsURL := fmt.Sprintf("%s/metrics/snapshot", u)
-		resp2, err := httpClient.Get(metricsURL)
-		if err != nil {
-			log.Warn(err)
-			e.errors.WithLabelValues(host).Inc()
-			continue
-		}
-		defer resp2.Body.Close()
-
-		var metrics SlaveMetrics
-		if err = json.NewDecoder(resp2.Body).Decode(&metrics); err != nil {
-			log.Warn("failed to deserialize response: ", err)
-			e.errors.WithLabelValues(host).Inc()
-			continue
-		}
-
-		reportMetric := func(desc *prometheus.Desc, value float64) {
-			metricsChan <- prometheus.MustNewConstMetric(
-				desc,
-				prometheus.GaugeValue,
-				value,
-				host,
-			)
-		}
-
-		reportMetric(slaveCpusPercent, metrics.SlaveCpusPercent)
-		reportMetric(slaveCpusTotal, metrics.SlaveCpusTotal)
-		reportMetric(slaveCpusUsed, metrics.SlaveCpusUsed)
-		reportMetric(slaveDiskPercent, metrics.SlaveDiskPercent)
-		reportMetric(slaveDiskTotal, metrics.SlaveDiskTotal)
-		reportMetric(slaveDiskUsed, metrics.SlaveDiskUsed)
-		reportMetric(slaveExecutorsRegistering, metrics.SlaveExecutorsRegistering)
-		reportMetric(slaveExecutorsRunning, metrics.SlaveExecutorsRunning)
-		reportMetric(slaveExecutorsTerminated, metrics.SlaveExecutorsTerminated)
-		reportMetric(slaveExecutorsTerminating, metrics.SlaveExecutorsTerminating)
-		reportMetric(slaveFrameworksActive, metrics.SlaveFrameworksActive)
-		reportMetric(slaveInvalidFrameworkMessages, metrics.SlaveInvalidFrameworkMessages)
-		reportMetric(slaveInvalidStatusUpdates, metrics.SlaveInvalidStatusUpdates)
-		reportMetric(slaveMemPercent, metrics.SlaveMemPercent)
-		reportMetric(slaveMemTotal, metrics.SlaveMemTotal)
-		reportMetric(slaveMemUsed, metrics.SlaveMemUsed)
-		reportMetric(slaveRecoveryErrors, metrics.SlaveRecoveryErrors)
-		reportMetric(slaveRegistered, metrics.SlaveRegistered)
-		reportMetric(slaveTasksFailed, metrics.SlaveTasksFailed)
-		reportMetric(slaveTasksFinished, metrics.SlaveTasksFinished)
-		reportMetric(slaveTasksKilled, metrics.SlaveTasksKilled)
-		reportMetric(slaveTasksLost, metrics.SlaveTasksLost)
-		reportMetric(slaveTasksRunning, metrics.SlaveTasksRunning)
-		reportMetric(slaveTasksStaging, metrics.SlaveTasksStaging)
-		reportMetric(slaveTasksStarting, metrics.SlaveTasksStarting)
-		reportMetric(slaveUptimeSecs, metrics.SlaveUptimeSecs)
-		reportMetric(slaveValidFrameworkMessages, metrics.SlaveValidFrameworkMessages)
-		reportMetric(slaveValidStatusUpdates, metrics.SlaveValidStatusUpdates)
-		reportMetric(sysCpusTotal, metrics.SystemCpusTotal)
-		reportMetric(sysLoad15min, metrics.SystemLoad15min)
-		reportMetric(sysLoad1min, metrics.SystemLoad1min)
-		reportMetric(sysLoad5min, metrics.SystemLoad5min)
-		reportMetric(sysMemFreeBytes, metrics.SystemMemFreeBytes)
-		reportMetric(sysMemTotalBytes, metrics.SystemMemTotalBytes)
+		wg.Add(2)
+		go e.fetchTaskMetrics(host, port, metricsChan, wg)
+		go e.fetchSlaveMetrics(host, port, metricsChan, wg)
 	}
 }
 
