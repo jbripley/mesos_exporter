@@ -17,19 +17,24 @@ import (
 
 const namespace = "mesos"
 const concurrentFetch = 100
+const defaultMasterURL = "http://mesos-master.example.com:5050"
 
 // Commandline flags.
 var (
 	addr         = flag.String("web.listen-address", ":9105", "Address to listen on for web interface and telemetry")
 	autoDiscover = flag.Bool("exporter.discovery", false, "Discover all Mesos slaves")
 	localURL     = flag.String("exporter.local-url", "http://127.0.0.1:5051", "URL to the local Mesos slave")
-	masterURL    = flag.String("exporter.discovery.master-url", "http://mesos-master.example.com:5050", "Mesos master URL")
+	masterURL    = flag.String("exporter.discovery.master-url", defaultMasterURL, "Mesos master URL")
 	metricsPath  = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
 )
 
 func newMetric(subsys string, labels []string, name string, descr string) *prometheus.Desc {
 	fqn := prometheus.BuildFQName(namespace, subsys, name)
 	return prometheus.NewDesc(fqn, descr, labels, nil)
+}
+
+func newMasterMetric(name string, descr string) *prometheus.Desc {
+	return newMetric("master", []string{}, name, descr)
 }
 
 func newSlaveMetric(name string, descr string) *prometheus.Desc {
@@ -43,64 +48,6 @@ func newSystemMetric(name string, descr string) *prometheus.Desc {
 func newTaskMetric(name string, descr string) *prometheus.Desc {
 	return newMetric("task", []string{"task", "slave", "framework_id"}, name, descr)
 }
-
-var (
-	slaveCpusPercent              = newSlaveMetric("cpus_percent", "CPU used in percent.")
-	slaveCpusTotal                = newSlaveMetric("cpus_total", "Total CPU count.")
-	slaveCpusUsed                 = newSlaveMetric("cpus_used", "CPUs allocated to tasks.")
-	slaveDiskPercent              = newSlaveMetric("disk_percent", "Disk usage in percent.")
-	slaveDiskTotal                = newSlaveMetric("disk_total", "Disk available.")
-	slaveDiskUsed                 = newSlaveMetric("disk_used", "Disk used.")
-	slaveExecutorsRegistering     = newSlaveMetric("executors_registering", "Executors registering count.")
-	slaveExecutorsRunning         = newSlaveMetric("executors_running", "Executors running count.")
-	slaveExecutorsTerminated      = newSlaveMetric("executors_terminated", "Executors terminated count.")
-	slaveExecutorsTerminating     = newSlaveMetric("executors_terminating", "Executors terminating count.")
-	slaveFrameworksActive         = newSlaveMetric("frameworks_active", "Number of active frameworks.")
-	slaveInvalidFrameworkMessages = newSlaveMetric("invalid_framework_messages", "Invalid framework message count.")
-	slaveInvalidStatusUpdates     = newSlaveMetric("invalid_status_updates", "Invalid status update count.")
-	slaveMemPercent               = newSlaveMetric("mem_percent", "Memory usage in percent.")
-	slaveMemTotal                 = newSlaveMetric("mem_total", "Memory total available.")
-	slaveMemUsed                  = newSlaveMetric("mem_used", "Memory total used.")
-	slaveRecoveryErrors           = newSlaveMetric("recovery_errors", "Recovery error count.")
-	slaveRegistered               = newSlaveMetric("registered", "Register count.")
-	slaveTasksFailed              = newSlaveMetric("tasks_failed", "Number of tasks failed.")
-	slaveTasksFinished            = newSlaveMetric("tasks_finished", "Number of tasks finished.")
-	slaveTasksKilled              = newSlaveMetric("tasks_killed", "Number of tasks killed.")
-	slaveTasksLost                = newSlaveMetric("tasks_lost", "Number of tasks lost.")
-	slaveTasksRunning             = newSlaveMetric("tasks_running", "Number of tasks running.")
-	slaveTasksStaging             = newSlaveMetric("tasks_staging", "Number of tasks staging.")
-	slaveTasksStarting            = newSlaveMetric("tasks_starting", "Number of tasks starting.")
-	slaveUptimeSecs               = newSlaveMetric("uptime_secs", "Slave uptime in seconds.")
-	slaveValidFrameworkMessages   = newSlaveMetric("valid_framework_messages", "Valid framework message count.")
-	slaveValidStatusUpdates       = newSlaveMetric("valid_status_updates", "Valid status updates count.")
-
-	sysCpusTotal     = newSystemMetric("cpus_total", "Total CPU count.")
-	sysLoad15min     = newSystemMetric("load_15min", "System load 15 minute.")
-	sysLoad1min      = newSystemMetric("load_1min", "System load 1 minute.")
-	sysLoad5min      = newSystemMetric("load_5min", "System load 5 minute.")
-	sysMemFreeBytes  = newSystemMetric("mem_free_bytes", "Total memory free in bytes.")
-	sysMemTotalBytes = newSystemMetric("mem_total_bytes", "Total memory used in bytes.")
-
-	taskCpuLimitDesc       = newTaskMetric("cpus_limit", "Fractional CPU limit")
-	taskCpuNrPeriodsDesc   = newTaskMetric("cpus_nr_periods", "Cumulative CPU periods.")
-	taskCpuNrThrottledDesc = newTaskMetric("cpus_nr_throttled", "Cumulative throttled CPU periods.")
-	taskCpuSysDesc         = newTaskMetric("cpus_system_time_secs", "Cumulative system CPU time in seconds.")
-	taskCpuThrottledDesc   = newTaskMetric("cpus_throttled_time_secs", "Cumulative throttled CPU time in seconds.")
-	taskCpuUsrDesc         = newTaskMetric("cpu_user_time_secs", "Cumulative user CPU time in seconds.")
-	taskMemAnonDesc        = newTaskMetric("memory_anon_bytes", "Task memory anonymous usage in bytes.")
-	taskMemFileDesc        = newTaskMetric("memory_file_bytes", "Task memory file usage in bytes.")
-	taskMemMappedDesc      = newTaskMetric("memory_mapped_bytes", "Task memory mapped usage in bytes.")
-	taskMemLimitDesc       = newTaskMetric("memory_limit_bytes", "Task memory limit in bytes.")
-	taskMemRssDesc         = newTaskMetric("memory_rss_bytes", "Task memory RSS usage in bytes.")
-	taskNetRxBytes         = newTaskMetric("net_rx_bytes", "Network received bytes.")
-	taskNetRxDropped       = newTaskMetric("net_rx_dropped", "Network received packets dropped.")
-	taskNetRxErrors        = newTaskMetric("net_rx_errors", "Network received packet errors.")
-	taskNetRxPackets       = newTaskMetric("net_rx_packets", "Network received packets.")
-	taskNetTxBytes         = newTaskMetric("net_tx_bytes", "Network sent bytes.")
-	taskNetTxDropped       = newTaskMetric("net_tx_dropped", "Network sent packets dropped.")
-	taskNetTxErrors        = newTaskMetric("net_tx_errors", "Network sent packets ererors.")
-	taskNetTxPackets       = newTaskMetric("net_tx_packets", "Network sent packets.")
-)
 
 var httpClient = http.Client{
 	Transport: &http.Transport{
@@ -174,6 +121,9 @@ func (e *exporter) Collect(ch chan<- prometheus.Metric) {
 
 func (e *exporter) fetchTaskMetrics(host string, port string, metricsChan chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	log.Debugf("Fetching task metrics for slave %s:%s", host, port)
+
 	url := fmt.Sprintf("http://%s:%s/monitor/statistics.json", host, port)
 	resp, err := httpClient.Get(url)
 	if err != nil {
@@ -222,8 +172,138 @@ func (e *exporter) fetchTaskMetrics(host string, port string, metricsChan chan<-
 	}
 }
 
+func (e *exporter) fetchMasterMetrics(metricsChan chan<- prometheus.Metric, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	if e.opts.masterURL == defaultMasterURL {
+		log.Info("Master metrics is only enabled when using autodiscovery.")
+		return
+	}
+
+	log.Debugf("Fetching master metrics")
+
+	masterUrl, err := e.findMaster()
+	if err != nil {
+		log.Warnf("Error finding elected master: %s", err)
+		return
+	}
+
+	url := fmt.Sprintf("%s/metrics/snapshot", masterUrl)
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		log.Warn(err)
+		return
+	}
+	defer resp.Body.Close()
+
+	var metrics MasterMetrics
+	if err = json.NewDecoder(resp.Body).Decode(&metrics); err != nil {
+		log.Warn("failed to deserialize response: ", err)
+		return
+	}
+
+	report := func(desc *prometheus.Desc, value float64) {
+		metricsChan <- prometheus.MustNewConstMetric(
+			desc,
+			prometheus.GaugeValue,
+			value,
+		)
+	}
+
+	report(masterCpusPercent, metrics.MasterCpusPercent)
+	report(masterCpusTotal, metrics.MasterCpusTotal)
+	report(masterCpusUsed, metrics.MasterCpusUsed)
+	report(masterDiskPercent, metrics.MasterDiskPercent)
+	report(masterDiskTotal, metrics.MasterDiskTotal)
+	report(masterDiskUsed, metrics.MasterDiskUsed)
+	report(masterDroppedMessages, metrics.MasterDroppedMessages)
+	report(masterElected, metrics.MasterElected)
+	report(masterEventQueueDispatches, metrics.MasterEventQueueDispatches)
+	report(masterEventQueueHttpRequests, metrics.MasterEventQueueHttpRequests)
+	report(masterEventQueueMessages, metrics.MasterEventQueueMessages)
+	report(masterFrameworksActive, metrics.MasterFrameworksActive)
+	report(masterFrameworksConnected, metrics.MasterFrameworksConnected)
+	report(masterFrameworksDisconnected, metrics.MasterFrameworksDisconnected)
+	report(masterFrameworksInactive, metrics.MasterFrameworksInactive)
+	report(masterInvalidFrameworkToExecutorMessages, metrics.MasterInvalidFrameworkToExecutorMessages)
+	report(masterInvalidStatusUpdateAcknowledgements, metrics.MasterInvalidStatusUpdateAcknowledgements)
+	report(masterInvalidStatusUpdates, metrics.MasterInvalidStatusUpdates)
+	report(masterMemPercent, metrics.MasterMemPercent)
+	report(masterMemTotal, metrics.MasterMemTotal)
+	report(masterMemUsed, metrics.MasterMemUsed)
+	report(masterMessagesAuthenticate, metrics.MasterMessagesAuthenticate)
+	report(masterMessagesDeactivateFramework, metrics.MasterMessagesDeactivateFramework)
+	report(masterMessagesDeclineOffers, metrics.MasterMessagesDeclineOffers)
+	report(masterMessagesExitedExecutor, metrics.MasterMessagesExitedExecutor)
+	report(masterMessagesFrameworkToExecutor, metrics.MasterMessagesFrameworkToExecutor)
+	report(masterMessagesKillTask, metrics.MasterMessagesKillTask)
+	report(masterMessagesLaunchTasks, metrics.MasterMessagesLaunchTasks)
+	report(masterMessagesReconcileTasks, metrics.MasterMessagesReconcileTasks)
+	report(masterMessagesRegisterFramework, metrics.MasterMessagesRegisterFramework)
+	report(masterMessagesRegisterSlave, metrics.MasterMessagesRegisterSlave)
+	report(masterMessagesReregisterFramework, metrics.MasterMessagesReregisterFramework)
+	report(masterMessagesReregisterSlave, metrics.MasterMessagesReregisterSlave)
+	report(masterMessagesResourceRequest, metrics.MasterMessagesResourceRequest)
+	report(masterMessagesReviveOffers, metrics.MasterMessagesReviveOffers)
+	report(masterMessagesStatusUpdate, metrics.MasterMessagesStatusUpdate)
+	report(masterMessagesStatusUpdate_acknowledgement, metrics.MasterMessagesStatusUpdate_acknowledgement)
+	report(masterMessagesUnregisterFramework, metrics.MasterMessagesUnregisterFramework)
+	report(masterMessagesUnregisterSlave, metrics.MasterMessagesUnregisterSlave)
+	report(masterOutstandingOffers, metrics.MasterOutstandingOffers)
+	report(masterRecoverySlaveRemovals, metrics.MasterRecoverySlaveRemovals)
+	report(masterSlaveRegistrations, metrics.MasterSlaveRegistrations)
+	report(masterSlaveRemovals, metrics.MasterSlaveRemovals)
+	report(masterSlaveReregistrations, metrics.MasterSlaveReregistrations)
+	report(masterSlaveShutdownsCanceled, metrics.MasterSlaveShutdownsCanceled)
+	report(masterSlaveShutdownsScheduled, metrics.MasterSlaveShutdownsScheduled)
+	report(masterSlavesActive, metrics.MasterSlavesActive)
+	report(masterSlavesConnected, metrics.MasterSlavesConnected)
+	report(masterSlavesDisconnected, metrics.MasterSlavesDisconnected)
+	report(masterSlavesInactive, metrics.MasterSlavesInactive)
+	report(masterTaskFailedSourceSlaveReasonMemoryLimit, metrics.MasterTaskFailedSourceSlaveReasonMemoryLimit)
+	report(masterTaskKilledSourceMasterReasonFrameworkRemoved, metrics.MasterTaskKilledSourceMasterReasonFrameworkRemoved)
+	report(masterTaskKilledSourceSlaveReasonExecutorUnregistered, metrics.MasterTaskKilledSourceSlaveReasonExecutorUnregistered)
+	report(masterTaskLostSourceMasterReasonSlaveDisconnected, metrics.MasterTaskLostSourceMasterReasonSlaveDisconnected)
+	report(masterTaskLostSourceMasterReasonSlaveRemoved, metrics.MasterTaskLostSourceMasterReasonSlaveRemoved)
+	report(masterTasksError, metrics.MasterTasksError)
+	report(masterTasksFailed, metrics.MasterTasksFailed)
+	report(masterTasksFinished, metrics.MasterTasksFinished)
+	report(masterTasksKilled, metrics.MasterTasksKilled)
+	report(masterTasksLost, metrics.MasterTasksLost)
+	report(masterTasksRunning, metrics.MasterTasksRunning)
+	report(masterTasksStaging, metrics.MasterTasksStaging)
+	report(masterTasksStarting, metrics.MasterTasksStarting)
+	report(masterUptimeSecs, metrics.MasterUptimeSecs)
+	report(masterValidFrameworkToExecutorMessages, metrics.MasterValidFrameworkToExecutorMessages)
+	report(masterValidStatusUpdateAcknowledgements, metrics.MasterValidStatusUpdateAcknowledgements)
+	report(masterValidStatusUpdates, metrics.MasterValidStatusUpdates)
+
+	report(registrarQueuedOperations, metrics.RegistrarQueuedOperations)
+	report(registrarRegistrySizeBytes, metrics.RegistrarRegistrySizeBytes)
+	report(registrarStateFetchMs, metrics.RegistrarStateFetchMs)
+	report(registrarStateStoreMs, metrics.RegistrarStateStoreMs)
+	report(registrarStateStoreMsCount, metrics.RegistrarStateStoreMsCount)
+	report(registrarStateStoreMsMax, metrics.RegistrarStateStoreMsMax)
+	report(registrarStateStoreMsMin, metrics.RegistrarStateStoreMsMin)
+	report(registrarStateStoreMsP50, metrics.RegistrarStateStoreMsP50)
+	report(registrarStateStoreMsP90, metrics.RegistrarStateStoreMsP90)
+	report(registrarStateStoreMsP95, metrics.RegistrarStateStoreMsP95)
+	report(registrarStateStoreMsP99, metrics.RegistrarStateStoreMsP99)
+	report(registrarStateStoreMsP999, metrics.RegistrarStateStoreMsP999)
+	report(registrarStateStoreMsP9999, metrics.RegistrarStateStoreMsP9999)
+
+	report(masterSystemCpusTotal, metrics.SystemCpusTotal)
+	report(masterSystemLoad15min, metrics.SystemLoad15min)
+	report(masterSystemLoad1min, metrics.SystemLoad1min)
+	report(masterSystemLoad5min, metrics.SystemLoad5min)
+	report(masterSystemMemFreeBytes, metrics.SystemMemFreeBytes)
+	report(masterSystemMemTotalBytes, metrics.SystemMemTotalBytes)
+}
+
 func (e *exporter) fetchSlaveMetrics(host string, port string, metricsChan chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	log.Debugf("Fetching slave metrics for %s:%s", host, port)
 
 	url := fmt.Sprintf("http://%s:%s/metrics/snapshot", host, port)
 	resp, err := httpClient.Get(url)
@@ -339,17 +419,19 @@ func (e *exporter) scrapeSlaves(ch chan<- prometheus.Metric) {
 	}
 	close(urlChan)
 
+	// Scrape master
+	wg.Add(1)
+	go e.fetchMasterMetrics(ch, &wg)
+
 	wg.Wait()
 }
 
-func (e *exporter) updateSlaves() {
-	log.Debug("discovering slaves...")
-
+func (e *exporter) findMaster() (string, error) {
 	// This will redirect us to the elected mesos master
 	redirectURL := fmt.Sprintf("%s/master/redirect", e.opts.masterURL)
 	rReq, err := http.NewRequest("GET", redirectURL, nil)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	tr := http.Transport{
@@ -357,8 +439,7 @@ func (e *exporter) updateSlaves() {
 	}
 	rresp, err := tr.RoundTrip(rReq)
 	if err != nil {
-		log.Warn(err)
-		return
+		return "", err
 	}
 	defer rresp.Body.Close()
 
@@ -366,13 +447,24 @@ func (e *exporter) updateSlaves() {
 	masterLoc := rresp.Header.Get("Location")
 	if masterLoc == "" {
 		log.Warnf("%d response missing Location header", rresp.StatusCode)
-		return
+		// FIXME: What to do here?
 	}
 
 	log.Debugf("current elected master at: %s", masterLoc)
+	return masterLoc, nil
+}
+
+func (e *exporter) updateSlaves() {
+	log.Debug("discovering slaves...")
+
+	masterUrl, err := e.findMaster()
+	if err != nil {
+		log.Warnf("Error finding elected master: %s", err)
+		return
+	}
 
 	// Find all active slaves
-	stateURL := fmt.Sprintf("%s/master/state.json", masterLoc)
+	stateURL := fmt.Sprintf("%s/master/state.json", masterUrl)
 	resp, err := http.Get(stateURL)
 	if err != nil {
 		log.Warn(err)
