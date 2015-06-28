@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,15 +16,12 @@ import (
 
 const namespace = "mesos"
 const concurrentFetch = 100
-const defaultMasterURL = "http://mesos-master.example.com:5050"
 
 // Commandline flags.
 var (
-	addr         = flag.String("web.listen-address", ":9105", "Address to listen on for web interface and telemetry")
-	autoDiscover = flag.Bool("exporter.discovery", false, "Discover all Mesos slaves")
-	localURL     = flag.String("exporter.local-url", "http://127.0.0.1:5051", "URL to the local Mesos slave")
-	masterURL    = flag.String("exporter.discovery.master-url", defaultMasterURL, "Mesos master URL")
-	metricsPath  = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
+	addr        = flag.String("web.listen-address", ":9105", "Address to listen on for web interface and telemetry")
+	masterAddr  = flag.String("mesos.master-address", "127.0.0.1:5050", "Mesos master address")
+	metricsPath = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
 )
 
 func newMetric(subsys string, labels []string, name string, descr string) *prometheus.Desc {
@@ -61,9 +57,7 @@ var httpClient = http.Client{
 }
 
 type exporterOpts struct {
-	autoDiscover bool
-	localURL     string
-	masterURL    string
+	masterURL string
 }
 
 type exporter struct {
@@ -88,15 +82,11 @@ func newMesosExporter(opts *exporterOpts) *exporter {
 		),
 		opts: opts,
 	}
-	e.slaves.urls = []string{e.opts.localURL}
+	e.slaves.urls = []string{}
 
-	if e.opts.autoDiscover {
-		log.Info("auto discovery enabled from command line flag.")
-
-		// Update nr. of mesos slaves every 10 minutes
-		e.updateSlaves()
-		go runEvery(e.updateSlaves, 10*time.Minute)
-	}
+	// Update nr. of mesos slaves every 10 minutes
+	e.updateSlaves()
+	go runEvery(e.updateSlaves, 10*time.Minute)
 
 	return e
 }
@@ -174,11 +164,6 @@ func (e *exporter) fetchTaskMetrics(host string, port string, metricsChan chan<-
 
 func (e *exporter) fetchMasterMetrics(metricsChan chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
-
-	if e.opts.masterURL == defaultMasterURL {
-		log.Info("Master metrics is only enabled when using autodiscovery.")
-		return
-	}
 
 	log.Debugf("Fetching master metrics")
 
@@ -518,9 +503,7 @@ func main() {
 	flag.Parse()
 
 	opts := &exporterOpts{
-		autoDiscover: *autoDiscover,
-		localURL:     strings.TrimRight(*localURL, "/"),
-		masterURL:    strings.TrimRight(*masterURL, "/"),
+		masterURL: fmt.Sprintf("http://%s", *masterAddr),
 	}
 	exporter := newMesosExporter(opts)
 	prometheus.MustRegister(exporter)
