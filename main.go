@@ -28,32 +28,32 @@ var (
 )
 
 var (
-	variableLabels = []string{"task", "slave", "framework_id"}
+	taskVariableLabels = []string{"task", "slave", "framework_id"}
 
-	cpuLimitDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "task_cpu_limit"),
+	taskCpuLimitDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "task", "cpus_limit"),
 		"Fractional CPU limit.",
-		variableLabels, nil,
+		taskVariableLabels, nil,
 	)
-	cpuSysDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "task_cpu_system_seconds_total"),
+	taskCpuSysDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "task", "cpus_system_time_secs"),
 		"Cumulative system CPU time in seconds.",
-		variableLabels, nil,
+		taskVariableLabels, nil,
 	)
-	cpuUsrDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "task_cpu_user_seconds_total"),
+	taskCpuUsrDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "task", "cpu_user_time_secs"),
 		"Cumulative user CPU time in seconds.",
-		variableLabels, nil,
+		taskVariableLabels, nil,
 	)
-	memLimitDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "task_memory_limit_bytes"),
+	taskMemLimitDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "task", "memory_limit_bytes"),
 		"Task memory limit in bytes.",
-		variableLabels, nil,
+		taskVariableLabels, nil,
 	)
-	memRssDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "task_memory_rss_bytes"),
+	taskMemRssDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "task", "memory_rss_bytes"),
 		"Task memory RSS usage in bytes.",
-		variableLabels, nil,
+		taskVariableLabels, nil,
 	)
 )
 
@@ -161,31 +161,31 @@ func (e *exporter) fetch(urlChan <-chan string, metricsChan chan<- prometheus.Me
 
 		for _, stat := range stats {
 			metricsChan <- prometheus.MustNewConstMetric(
-				cpuLimitDesc,
+				taskCpuLimitDesc,
 				prometheus.GaugeValue,
 				float64(stat.Statistics.CpusLimit),
 				stat.Source, host, stat.FrameworkId,
 			)
 			metricsChan <- prometheus.MustNewConstMetric(
-				cpuSysDesc,
+				taskCpuSysDesc,
 				prometheus.CounterValue,
 				float64(stat.Statistics.CpusSystemTimeSecs),
 				stat.Source, host, stat.FrameworkId,
 			)
 			metricsChan <- prometheus.MustNewConstMetric(
-				cpuUsrDesc,
+				taskCpuUsrDesc,
 				prometheus.CounterValue,
 				float64(stat.Statistics.CpusUserTimeSecs),
 				stat.Source, host, stat.FrameworkId,
 			)
 			metricsChan <- prometheus.MustNewConstMetric(
-				memLimitDesc,
+				taskMemLimitDesc,
 				prometheus.GaugeValue,
 				float64(stat.Statistics.MemLimitBytes),
 				stat.Source, host, stat.FrameworkId,
 			)
 			metricsChan <- prometheus.MustNewConstMetric(
-				memRssDesc,
+				taskMemRssDesc,
 				prometheus.GaugeValue,
 				float64(stat.Statistics.MemRssBytes),
 				stat.Source, host, stat.FrameworkId,
