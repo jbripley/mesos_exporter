@@ -146,6 +146,8 @@ func (e *exporter) fetchTaskMetrics(host string, port string, metricsChan chan<-
 		report(&mon, taskCpuSysDesc, stats.CpusSystemTimeSecs)
 		report(&mon, taskCpuThrottledDesc, stats.CpusThrottledTimeSecs)
 		report(&mon, taskCpuUsrDesc, stats.CpusUserTimeSecs)
+		report(&mon, taskDiskLimitBytes, stats.DiskLimitBytes)
+		report(&mon, taskDiskUsedBytes, stats.DiskUsedBytes)
 		report(&mon, taskMemAnonDesc, stats.MemAnonBytes)
 		report(&mon, taskMemFileDesc, stats.MemFileBytes)
 		report(&mon, taskMemLimitDesc, stats.MemLimitBytes)

@@ -43,6 +43,8 @@ var (
 	taskCpuSysDesc         = newTaskMetric("cpus_system_time_secs", "Cumulative system CPU time in seconds.")
 	taskCpuThrottledDesc   = newTaskMetric("cpus_throttled_time_secs", "Cumulative throttled CPU time in seconds.")
 	taskCpuUsrDesc         = newTaskMetric("cpu_user_time_secs", "Cumulative user CPU time in seconds.")
+	taskDiskLimitBytes     = newTaskMetric("disk_limit_bytes", "Task disk quota.")
+	taskDiskUsedBytes      = newTaskMetric("disk_used_bytes", "Task disk usage.")
 	taskMemAnonDesc        = newTaskMetric("memory_anon_bytes", "Task memory anonymous usage in bytes.")
 	taskMemFileDesc        = newTaskMetric("memory_file_bytes", "Task memory file usage in bytes.")
 	taskMemMappedDesc      = newTaskMetric("memory_mapped_bytes", "Task memory mapped usage in bytes.")

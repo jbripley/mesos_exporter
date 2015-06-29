@@ -16,6 +16,8 @@ type Statistics struct {
 	CpusSystemTimeSecs    float64 `json:"cpus_system_time_secs"`
 	CpusThrottledTimeSecs float64 `json:"cpus_throttled_time_secs"`
 	CpusUserTimeSecs      float64 `json:"cpus_user_time_secs"`
+	DiskLimitBytes        float64 `json:"disk_limit_bytes"`
+	DiskUsedBytes         float64 `json:"disk_used_bytes"`
 	MemAnonBytes          float64 `json:"mem_anon_bytes"`
 	MemFileBytes          float64 `json:"mem_file_bytes"`
 	MemLimitBytes         float64 `json:"mem_limit_bytes"`
