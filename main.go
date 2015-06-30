@@ -34,15 +34,15 @@ func newMasterMetric(name string, descr string) *prometheus.Desc {
 }
 
 func newSlaveMetric(name string, descr string) *prometheus.Desc {
-	return newMetric("slave", []string{"slave"}, name, descr)
+	return newMetric("slave", []string{"instance"}, name, descr)
 }
 
 func newSystemMetric(name string, descr string) *prometheus.Desc {
-	return newMetric("system", []string{"slave"}, name, descr)
+	return newMetric("system", []string{"instance"}, name, descr)
 }
 
 func newTaskMetric(name string, descr string) *prometheus.Desc {
-	return newMetric("task", []string{"task", "slave", "framework_id"}, name, descr)
+	return newMetric("task", []string{"instance", "slave", "framework_id"}, name, descr)
 }
 
 var httpClient = http.Client{
