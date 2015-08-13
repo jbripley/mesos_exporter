@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -169,13 +170,17 @@ func (e *exporter) fetchMasterMetrics(metricsChan chan<- prometheus.Metric, wg *
 
 	log.Debugf("Fetching master metrics")
 
-	masterUrl, err := e.findMaster()
+	masterURL, err := e.findMaster()
 	if err != nil {
 		log.Warnf("Error finding elected master: %s", err)
 		return
 	}
 
-	url := fmt.Sprintf("%s/metrics/snapshot", masterUrl)
+	if strings.HasPrefix(masterURL, "//") {
+		masterURL = "http:" + masterURL
+	}
+
+	url := fmt.Sprintf("%s/metrics/snapshot", masterURL)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		log.Warn(err)
@@ -428,6 +433,10 @@ func (e *exporter) findMaster() (string, error) {
 		// FIXME: What to do here?
 	}
 
+	if strings.HasPrefix(masterLoc, "//") {
+		masterLoc = "http:" + masterLoc
+	}
+
 	log.Debugf("current elected master at: %s", masterLoc)
 	return masterLoc, nil
 }
@@ -435,14 +444,18 @@ func (e *exporter) findMaster() (string, error) {
 func (e *exporter) updateSlaves() {
 	log.Debug("discovering slaves...")
 
-	masterUrl, err := e.findMaster()
+	masterURL, err := e.findMaster()
 	if err != nil {
 		log.Warnf("Error finding elected master: %s", err)
 		return
 	}
 
+	if strings.HasPrefix(masterURL, "//") {
+		masterURL = "http:" + masterURL
+	}
+
 	// Find all active slaves
-	stateURL := fmt.Sprintf("%s/master/state.json", masterUrl)
+	stateURL := fmt.Sprintf("%s/master/state.json", masterURL)
 	resp, err := http.Get(stateURL)
 	if err != nil {
 		log.Warn(err)
