@@ -414,15 +414,19 @@ func (e *exporter) findMaster() (string, error) {
 	redirectURL := fmt.Sprintf("%s/master/redirect", e.opts.masterURL)
 	rReq, err := http.NewRequest("GET", redirectURL, nil)
 	if err != nil {
-		return "", err
+		panic("Failed to create response to find elect Mesos master")
 	}
 
 	tr := http.Transport{
 		DisableKeepAlives: true,
+		Dial: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 5 * time.Second,
+		}).Dial,
 	}
 	rresp, err := tr.RoundTrip(rReq)
 	if err != nil {
-		return "", err
+		panic("Failed to perform request to find Mesos master")
 	}
 	defer rresp.Body.Close()
 
