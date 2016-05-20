@@ -169,13 +169,13 @@ func (e *exporter) fetchMasterMetrics(metricsChan chan<- prometheus.Metric, wg *
 
 	log.Debugf("Fetching master metrics")
 
-	masterUrl, err := e.findMaster()
+	master, err := e.findMaster()
 	if err != nil {
 		log.Warnf("Error finding elected master: %s", err)
 		return
 	}
 
-	url := fmt.Sprintf("%s/metrics/snapshot", masterUrl)
+	url := fmt.Sprintf("http://%s/metrics/snapshot", master)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		log.Warn(err)
@@ -415,34 +415,38 @@ func (e *exporter) findMaster() (string, error) {
 	tr := http.Transport{
 		DisableKeepAlives: true,
 	}
+
 	rresp, err := tr.RoundTrip(rReq)
 	if err != nil {
 		return "", err
 	}
 	defer rresp.Body.Close()
 
-	// This will/should return http://master.ip:5050
+	// This will return //master.ip:5050 mesos >0.27
 	masterLoc := rresp.Header.Get("Location")
 	if masterLoc == "" {
 		log.Warnf("%d response missing Location header", rresp.StatusCode)
 		// FIXME: What to do here?
 	}
-
-	log.Debugf("current elected master at: %s", masterLoc)
-	return masterLoc, nil
+	u, err := url.Parse(masterLoc)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Debugf("current elected master at: %s", u.Host)
+	return u.Host, nil
 }
 
 func (e *exporter) updateSlaves() {
 	log.Debug("discovering slaves...")
 
-	masterUrl, err := e.findMaster()
+	master, err := e.findMaster()
 	if err != nil {
 		log.Warnf("Error finding elected master: %s", err)
 		return
 	}
 
 	// Find all active slaves
-	stateURL := fmt.Sprintf("%s/master/state.json", masterUrl)
+	stateURL := fmt.Sprintf("http://%s/master/state.json", master)
 	resp, err := http.Get(stateURL)
 	if err != nil {
 		log.Warn(err)
